@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 const { embed, successEmbed, errorEmbed } = require('../../utils/embed');
 const { L } = require('../../utils/i18n');
 const {
@@ -12,6 +12,8 @@ const {
 
 const CATEGORY_CHOICES = CATEGORIES.map((c) => ({ name: `${c.icon} ${c.ar} / ${c.en}`, value: c.id }));
 
+const pendingCategory = new Map();
+
 module.exports = {
   category: 'shop',
   descEn: 'Manage shop products (developer only)',
@@ -21,17 +23,15 @@ module.exports = {
     .setDescriptionLocalizations({ 'en-US': 'Manage shop products (developer only)' })
     .addSubcommand((s) => s
       .setName('add')
-      .setDescription('اضافة منتج جديد')
-      .setDescriptionLocalizations({ 'en-US': 'Add a new product' })
-      .addStringOption((o) => o.setName('category').setDescription('فئة المنتج').setRequired(true).addChoices(...CATEGORY_CHOICES))
-      .addStringOption((o) => o.setName('name').setDescription('اسم المنتج').setRequired(true).setMaxLength(60))
-      .addStringOption((o) => o.setName('description').setDescription('وصف المنتج').setRequired(true).setMaxLength(300))
-      .addStringOption((o) => o.setName('content').setDescription('محتوى المنتج (يُرسل للمشترك)').setRequired(true).setMaxLength(1000))
-      .addStringOption((o) => o.setName('price').setDescription('السعر (اختياري)').setRequired(false).setMaxLength(40))
-      .addStringOption((o) => o.setName('duration').setDescription('المدة الافتراضية (اختياري) مثال: 30d').setRequired(false).setMaxLength(20)))
+      .setDescription('اضافة منتج جديد بسهولة من نافذة')
+      .setDescriptionLocalizations({ 'en-US': 'Add a new product easily from a window' })
+      .addStringOption((o) => o.setName('category').setDescription('فئة المنتج').setRequired(true).addChoices(...CATEGORY_CHOICES)))
     .addSubcommand((s) => s.setName('list').setDescription('عرض كل المنتجات').setDescriptionLocalizations({ 'en-US': 'List all products' }))
     .addSubcommand((s) => s.setName('remove').setDescription('حذف منتج').setDescriptionLocalizations({ 'en-US': 'Remove a product' }).addStringOption((o) => o.setName('id').setDescription('ايدي او اسم المنتج').setRequired(true)))
     .addSubcommand((s) => s.setName('toggle').setDescription('تفعيل/ايقاف منتج').setDescriptionLocalizations({ 'en-US': 'Enable/disable a product' }).addStringOption((o) => o.setName('id').setDescription('ايدي او اسم المنتج').setRequired(true)))
+    .addSubcommand((s) => s.setName('link').setDescription('اضافة/تغيير رابط المحتوى المخصص للمنتج').setDescriptionLocalizations({ 'en-US': 'Set a custom content link for the product' })
+      .addStringOption((o) => o.setName('id').setDescription('ايدي او اسم المنتج').setRequired(true))
+      .addStringOption((o) => o.setName('url').setDescription('الرابط').setRequired(true)))
     .setDefaultMemberPermissions(8),
   devOnly: true,
   async run(client, interaction) {
@@ -40,16 +40,51 @@ module.exports = {
 
     if (sub === 'add') {
       const category = interaction.options.getString('category');
-      const name = interaction.options.getString('name');
-      const description = interaction.options.getString('description');
-      const price = interaction.options.getString('price');
-      const duration = interaction.options.getString('duration');
-      const content = interaction.options.getString('content');
+      pendingCategory.set(l, category);
+      setTimeout(() => pendingCategory.delete(l), 5 * 60 * 1000);
 
-      const product = createProduct({ name, description, price, duration, content, category });
-      const cat = CATEGORIES.find((c) => c.id === product.category);
-      const descMsg = `**${cat.icon} ${cat.ar}**\n**المنتج:** ${product.name}\n**الايدي:** \`${product.id}\`\n${price ? `**السعر:** ${price}\n` : ''}${duration ? `**المدة:** ${duration}\n` : ''}\n\n🎟️ تذكّر: سيريال الاشتراك الواحد بيفعّل **كل المنتجات** للعميل.`;
-      return interaction.reply({ embeds: [successEmbed(interaction.guild, L(l, '✅ تم اضافة المنتج', '✅ Product added'), descMsg)] });
+      const nameInput = new TextInputBuilder()
+        .setCustomId('product_name')
+        .setLabel('اسم المنتج')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(60);
+      const descInput = new TextInputBuilder()
+        .setCustomId('product_desc')
+        .setLabel('وصف المنتج')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true)
+        .setMaxLength(300);
+      const contentInput = new TextInputBuilder()
+        .setCustomId('product_content')
+        .setLabel('محتوى المنتج (يُرسل للمشترك عند التفعيل)')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(false)
+        .setMaxLength(1000);
+      const priceInput = new TextInputBuilder()
+        .setCustomId('product_price')
+        .setLabel('السعر (اختياري)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setMaxLength(40);
+      const durationInput = new TextInputBuilder()
+        .setCustomId('product_duration')
+        .setLabel('المدة (اختياري) مثال: 30d')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setMaxLength(20);
+
+      const modal = new ModalBuilder()
+        .setCustomId('product_add_modal')
+        .setTitle(`➕ اضافة منتج — ${CATEGORIES.find((c) => c.id === category)?.icon || '🛒'} ${CATEGORIES.find((c) => c.id === category)?.ar || category}`)
+        .addComponents(
+          new ActionRowBuilder().addComponents(nameInput),
+          new ActionRowBuilder().addComponents(descInput),
+          new ActionRowBuilder().addComponents(contentInput),
+          new ActionRowBuilder().addComponents(priceInput),
+          new ActionRowBuilder().addComponents(durationInput),
+        );
+      return interaction.showModal(modal);
     }
 
     if (sub === 'list') {
@@ -83,5 +118,38 @@ module.exports = {
       const p = toggleProduct(product.id);
       return interaction.reply({ embeds: [successEmbed(interaction.guild, L(l, '✅ تم', '✅ Done'), `${L(l, 'المنتج', 'Product')} **${p.name}** ${p.enabled ? L(l, 'اصبح متاحا', 'is now available') : L(l, 'تم ايقافه', 'is now disabled')}`)] });
     }
+
+    if (sub === 'link') {
+      const url = interaction.options.getString('url');
+      product.contentLink = url;
+      const { saveShop } = require('../../services/shopService');
+      saveShop(getShop());
+      return interaction.reply({ embeds: [successEmbed(interaction.guild, L(l, '✅ تم الحفظ', '✅ Saved'), `${L(l, 'تم تحديث رابط', 'Content link updated for')} **${product.name}**`)] });
+    }
   },
+};
+
+// معالجة إرسال النافذة
+async function handleModal(client, interaction) {
+  const l = interaction.user.id;
+  const category = pendingCategory.get(l);
+  if (!category) {
+    return interaction.reply({ embeds: [errorEmbed(interaction.guild, '❌', L(l, 'انتهت الجلسة، استخدم /product add من جديد', 'Session expired, run /product add again'))] });
+  }
+  pendingCategory.delete(l);
+
+  const name = interaction.fields.getTextInputValue('product_name')?.trim();
+  const description = interaction.fields.getTextInputValue('product_desc')?.trim();
+  const content = interaction.fields.getTextInputValue('product_content')?.trim() || '';
+  const price = interaction.fields.getTextInputValue('product_price')?.trim() || null;
+  const duration = interaction.fields.getTextInputValue('product_duration')?.trim() || null;
+
+  const product = createProduct({ name, description, price, duration, content, category });
+  const cat = CATEGORIES.find((c) => c.id === product.category);
+  const descMsg = `**${cat.icon} ${cat.ar}**\n**المنتج:** ${product.name}\n**الايدي:** \`${product.id}\`\n${price ? `**السعر:** ${price}\n` : ''}${duration ? `**المدة:** ${duration}\n` : ''}\n\n🎟️ تذكّر: سيريال الاشتراك الواحد بيفعّل **كل المنتجات** للعميل.`;
+  return interaction.reply({ embeds: [successEmbed(interaction.guild, L(l, '✅ تم اضافة المنتج', '✅ Product added'), descMsg)] });
+}
+
+module.exports.components = {
+  'product_add_modal': handleModal,
 };
