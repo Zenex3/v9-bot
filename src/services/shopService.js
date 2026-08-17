@@ -69,7 +69,7 @@ function findProduct(shop, query) {
   return list.find((p) => p.name.toLowerCase() === query.toLowerCase()) || null;
 }
 
-function createProduct({ name, description, price, duration, content, category }) {
+function createProduct({ name, description, price, duration, content, category, image }) {
   const shop = getShop();
   const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const product = {
@@ -79,6 +79,7 @@ function createProduct({ name, description, price, duration, content, category }
     price: price || null,
     duration: duration || null,
     content: content || '',
+    image: image || null,
     category: CATEGORIES.some((c) => c.id === category) ? category : 'tools',
     enabled: true,
     createdAt: Date.now(),
@@ -330,20 +331,21 @@ function buildCategoryEmbed(user, categoryId, guild, shopOverride) {
       `لا توجد منتجات في فئة ${cat.icon} ${cat.ar} حاليا، تابعنا في السيرفر!`,
       `No products in the ${cat.en} category yet, stay tuned in the server!`);
   } else {
+    const owned = isSubscribed(userId);
     desc = list.map((p, i) => {
-      const price = p.price ? `\n**${pick(userId, '💰 السعر', '💰 Price')}:** ${p.price}` : '';
-      const dur = p.duration ? `\n**${pick(userId, '⏳ المدة', '⏳ Duration')}:** ${p.duration}` : '';
-      return `**${i + 1}) ${p.name}**\n${p.description}${price}${dur}`;
+      const mark = owned ? '✅ ' : '';
+      return `**${i + 1}) ${mark}${p.name}**\n${p.description}`;
     }).join('\n\n');
-    desc += `\n\n**${pick(userId, '⬇️ اختر المنتج من القائمة بالاسفل لعرض الخدمة بالتفصيل', '⬇️ Select a product below to view its service details')}**`;
+    desc += `\n\n**${pick(userId, '⬇️ اختر المنتج من القائمة بالاسفل لعرض التفاصيل', '⬇️ Select a product below to view details')}**`;
   }
 
   const select = new StringSelectMenuBuilder()
     .setCustomId('shop_prod')
     .setPlaceholder(pick(userId, '📦 اختر منتج...', '📦 Select a product...'));
   if (list.length) {
+    const owned = isSubscribed(userId);
     select.addOptions(list.map((p) => new StringSelectMenuOptionBuilder()
-      .setLabel(p.name)
+      .setLabel((owned ? '✅ ' : '') + p.name.slice(0, 80))
       .setValue(p.id)
       .setDescription((p.description || '').slice(0, 100) || pick(userId, 'عرض التفاصيل', 'View details'))
       .setEmoji(cat.icon)));
@@ -388,13 +390,15 @@ function buildProductDetail(user, productId, guild, shopOverride) {
   let extra;
   if (subscribed) {
     extra = pick(userId,
-      `\n\n✅ **الخدمة متاحة لك الآن!**\n\n**🔗 تفاصيل الخدمة / طريقة الاستخدام:**\n${p.content || '_لا يوجد محتوى إضافي_'}`,
-      `\n\n✅ **This service is now available to you!**\n\n**🔗 Service details / how to use:**\n${p.content || '_No extra content_'}`);
+      `\n\n✅ **الخدمة متاحة لك الآن!**\n\n━━━━━━━━━━━━━━━━\n**🔗 تفاصيل الخدمة / طريقة الاستخدام:**\n${p.content || '_لا يوجد محتوى إضافي_'}`,
+      `\n\n✅ **This service is now available to you!**\n\n━━━━━━━━━━━━━━━━\n**🔗 Service details / how to use:**\n${p.content || '_No extra content_'}`);
   } else {
     extra = pick(userId,
       `\n\n🔒 **الخدمة مقفولة** — اشتراك واحد بيفعّل كل المنتجات بالكامل.\n⚠️ **عشان تستخدم الخدمة لازم تشترك من هنا:**\n🔗 **${shop.invite}**\n\n**📥 عندك سيريال؟** فعّله بامر \`/redeem\``,
       `\n\n🔒 **Service locked** — one subscription unlocks all products.\n⚠️ **To use this service you must subscribe here:**\n🔗 **${shop.invite}**\n\n**📥 Have a serial?** Use \`/redeem\` or send it in DM`);
   }
+
+  const extraImage = subscribed && p.image ? p.image : null;
 
   const backRow = row(
     new ButtonBuilder().setCustomId('shop_cat_' + cat.id).setLabel(pick(userId, `⬅️ رجوع ل${cat.icon} ${pick(userId, cat.ar, cat.en)}`, `⬅️ Back to ${cat.en}`)).setStyle(ButtonStyle.Secondary),
@@ -405,6 +409,7 @@ function buildProductDetail(user, productId, guild, shopOverride) {
     embeds: [embed(guild, {
       title: `${cat.icon} ${p.name}`,
       description: `${p.description}${price}${dur}${categoryLine}${extra}`,
+      image: extraImage,
       footer: { text: shop.invite },
       color: 'red',
     })],
@@ -416,32 +421,50 @@ function buildSubscriptionEmbed(user, guild, shopOverride) {
   const shop = shopOverride || getShop();
   const userId = user.id;
   const sub = getUserSubscription(userId);
+  const embeds = [];
   let desc;
 
   if (!sub) {
     desc = pick(userId,
       `لا يوجد اشتراك مفعل عندك حتى الان.\n\n⚠️ **عشان تشترك لازم تشتري سيريال من هنا:**\n🔗 **${shop.invite}**\n\nبعد ما تشتريه فعّله بامر \`/redeem\``,
       `You don't have an active subscription yet.\n\n⚠️ **To subscribe you must buy a serial from here:**\n🔗 **${shop.invite}**\n\nAfter buying it, send it here in DM or type \`/redeem\``);
+    embeds.push(embed(guild, {
+      title: pick(userId, '📦 اشتراكي', '📦 My Subscription'),
+      description: desc,
+      footer: { text: shop.invite },
+      color: 'red',
+    }));
   } else {
     const active = sub.expiresAt > Date.now();
     desc = pick(userId,
       `${active ? '🟢 **اشتراكك مفعل**' : '🔴 **اشتراكك منتهي**'}\n**السيريال:** \`${sub.key}\`\n**فُعل:** ${relative(sub.activatedAt)}\n**ينتهي:** ${relative(sub.expiresAt)}`,
       `${active ? '🟢 **Subscription active**' : '🔴 **Subscription expired**'}\n**Serial:** \`${sub.key}\`\n**Activated:** ${relative(sub.activatedAt)}\n**Expires:** ${relative(sub.expiresAt)}`);
+    embeds.push(embed(guild, {
+      title: pick(userId, '📦 اشتراكي', '📦 My Subscription'),
+      description: desc,
+      footer: { text: shop.invite },
+      color: active ? 'success' : 'red',
+    }));
+
     if (active) {
-      const content = getAllProductsContent(shop);
-      if (content) desc += `\n\n**${pick(userId, '📦 محتوى كل منتجاتك:', '📦 All your products content:')}**\n${content}`;
+      for (const p of Object.values(shop.products)) {
+        if (!p.enabled) continue;
+        if (embeds.length >= 10) break;
+        const body = p.content || p.description || '_لا يوجد محتوى إضافي_';
+        embeds.push(embed(guild, {
+          title: `📦 ${p.name}`,
+          description: `━━━━━━━━━━━━━━━━\n${body}\n━━━━━━━━━━━━━━━━`,
+          image: p.image || null,
+          color: 'success',
+        }));
+      }
     }
   }
 
   const components = isSubscribed(userId) ? [shopMenuRow(userId)] : [];
 
   return {
-    embeds: [embed(guild, {
-      title: pick(userId, '📦 اشتراكي', '📦 My Subscription'),
-      description: desc,
-      footer: { text: shop.invite },
-      color: 'red',
-    })],
+    embeds,
     components,
   };
 }

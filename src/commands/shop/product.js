@@ -30,6 +30,9 @@ module.exports = {
     .addSubcommand((s) => s.setName('link').setDescription('اضافة/تغيير رابط المحتوى المخصص للمنتج').setDescriptionLocalizations({ 'en-US': 'Set a custom content link for the product' })
       .addStringOption((o) => o.setName('id').setDescription('ايدي او اسم المنتج').setRequired(true))
       .addStringOption((o) => o.setName('url').setDescription('الرابط').setRequired(true)))
+    .addSubcommand((s) => s.setName('image').setDescription('اضافة/تغيير صورة المنتج (تظهر للمشترك)').setDescriptionLocalizations({ 'en-US': 'Set product image (shown to subscriber)' })
+      .addStringOption((o) => o.setName('id').setDescription('ايدي او اسم المنتج').setRequired(true))
+      .addStringOption((o) => o.setName('url').setDescription('رابط الصورة — مثال: https://.../img.png').setRequired(true)))
     .setDefaultMemberPermissions(8),
   devOnly: true,
   async run(client, interaction) {
@@ -59,12 +62,12 @@ module.exports = {
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
         .setMaxLength(1000);
-      const priceInput = new TextInputBuilder()
-        .setCustomId('product_price')
-        .setLabel('السعر (اختياري)')
+      const imageInput = new TextInputBuilder()
+        .setCustomId('product_image')
+        .setLabel('رابط صورة المنتج (اختياري) — تظهر للمشترك')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
-        .setMaxLength(40);
+        .setMaxLength(200);
       const durationInput = new TextInputBuilder()
         .setCustomId('product_duration')
         .setLabel('المدة (اختياري) مثال: 30d')
@@ -79,7 +82,7 @@ module.exports = {
           new ActionRowBuilder().addComponents(nameInput),
           new ActionRowBuilder().addComponents(descInput),
           new ActionRowBuilder().addComponents(contentInput),
-          new ActionRowBuilder().addComponents(priceInput),
+          new ActionRowBuilder().addComponents(imageInput),
           new ActionRowBuilder().addComponents(durationInput),
         );
       return interaction.showModal(modal);
@@ -124,6 +127,14 @@ module.exports = {
       saveShop(getShop());
       return interaction.reply({ embeds: [successEmbed(interaction.guild, L(l, '✅ تم الحفظ', '✅ Saved'), `${L(l, 'تم تحديث رابط', 'Content link updated for')} **${product.name}**`)] });
     }
+
+    if (sub === 'image') {
+      const url = interaction.options.getString('url');
+      product.image = url || null;
+      const { saveShop } = require('../../services/shopService');
+      saveShop(getShop());
+      return interaction.reply({ embeds: [successEmbed(interaction.guild, L(l, '✅ تم الحفظ', '✅ Saved'), `${L(l, 'تم تحديث صورة', 'Product image updated for')} **${product.name}**`)] });
+    }
   },
 };
 
@@ -138,12 +149,12 @@ async function handleModal(client, interaction) {
   const name = interaction.fields.getTextInputValue('product_name')?.trim();
   const description = interaction.fields.getTextInputValue('product_desc')?.trim();
   const content = interaction.fields.getTextInputValue('product_content')?.trim() || '';
-  const price = interaction.fields.getTextInputValue('product_price')?.trim() || null;
   const duration = interaction.fields.getTextInputValue('product_duration')?.trim() || null;
+  const image = interaction.fields.getTextInputValue('product_image')?.trim() || null;
 
-  const product = createProduct({ name, description, price, duration, content, category });
+  const product = createProduct({ name, description, duration, content, category, image });
   const cat = CATEGORIES.find((c) => c.id === product.category);
-  const descMsg = `**${cat.icon} ${cat.ar}**\n**المنتج:** ${product.name}\n**الايدي:** \`${product.id}\`\n${price ? `**السعر:** ${price}\n` : ''}${duration ? `**المدة:** ${duration}\n` : ''}\n\n🎟️ تذكّر: سيريال الاشتراك الواحد بيفعّل **كل المنتجات** للعميل.`;
+  const descMsg = `**${cat.icon} ${cat.ar}**\n**المنتج:** ${product.name}\n**الايدي:** \`${product.id}\`\n${duration ? `**المدة:** ${duration}\n` : ''}${image ? `**🖼️ صورة:** اضيفت ✅\n` : ''}\n\n🎟️ تذكّر: سيريال الاشتراك الواحد بيفعّل **كل المنتجات** للعميل.`;
   return interaction.reply({ embeds: [successEmbed(interaction.guild, L(l, '✅ تم اضافة المنتج', '✅ Product added'), descMsg)] });
 }
 
