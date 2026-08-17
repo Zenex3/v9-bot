@@ -12,8 +12,6 @@ const {
 
 const CATEGORY_CHOICES = CATEGORIES.map((c) => ({ name: `${c.icon} ${c.ar} / ${c.en}`, value: c.id }));
 
-const pendingCategory = new Map();
-
 module.exports = {
   category: 'shop',
   descEn: 'Manage shop products (developer only)',
@@ -40,8 +38,8 @@ module.exports = {
 
     if (sub === 'add') {
       const category = interaction.options.getString('category');
-      pendingCategory.set(l, category);
-      setTimeout(() => pendingCategory.delete(l), 5 * 60 * 1000);
+      // الكاتيجوري محفوظة في customId كي لا تعتمد على حالة مشتركة بين نسختين من الملف
+      const modalCustomId = `product_add_modal_${category}`;
 
       const nameInput = new TextInputBuilder()
         .setCustomId('product_name')
@@ -75,7 +73,7 @@ module.exports = {
         .setMaxLength(20);
 
       const modal = new ModalBuilder()
-        .setCustomId('product_add_modal')
+        .setCustomId(modalCustomId)
         .setTitle(`➕ اضافة منتج — ${CATEGORIES.find((c) => c.id === category)?.icon || '🛒'} ${CATEGORIES.find((c) => c.id === category)?.ar || category}`)
         .addComponents(
           new ActionRowBuilder().addComponents(nameInput),
@@ -129,14 +127,13 @@ module.exports = {
   },
 };
 
-// معالجة إرسال النافذة
+// معالجة إرسال النافذة — البادئة تجلب الكاتيجوري من customId مباشرة
 async function handleModal(client, interaction) {
   const l = interaction.user.id;
-  const category = pendingCategory.get(l);
-  if (!category) {
-    return interaction.reply({ embeds: [errorEmbed(interaction.guild, '❌', L(l, 'انتهت الجلسة، استخدم /product add من جديد', 'Session expired, run /product add again'))] });
+  const category = interaction.customId.replace('product_add_modal_', '');
+  if (!CATEGORIES.some((c) => c.id === category)) {
+    return interaction.reply({ embeds: [errorEmbed(interaction.guild, '❌', L(l, 'فئة غير صالحة، استخدم /product add من جديد', 'Invalid category, run /product add again'))] });
   }
-  pendingCategory.delete(l);
 
   const name = interaction.fields.getTextInputValue('product_name')?.trim();
   const description = interaction.fields.getTextInputValue('product_desc')?.trim();
@@ -151,5 +148,5 @@ async function handleModal(client, interaction) {
 }
 
 module.exports.components = {
-  'product_add_modal': handleModal,
+  'product_add_modal_*': handleModal,
 };
