@@ -1,0 +1,9 @@
+{
+  "token": "YOUR_BOT_TOKEN_HERE",
+  "clientId": "YOUR_CLIENT_ID",
+  "owners": ["YOUR_DISCORD_ID"],
+  "color": "#E60000",
+  "colorDark": "#8B0000",
+  "devGuildId": "YOUR_DEV_GUILD_ID",
+  "invitePermissions": "8"
+}

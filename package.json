@@ -1,0 +1,15 @@
+{
+  "name": "v9-bot",
+  "version": "1.0.0",
+  "description": "احترافي بوت ديسكورد - V9 Bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "register": "node src/utils/registerCommands.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.15.3",
+    "firebase": "^12.17.1"
+  }
+}
