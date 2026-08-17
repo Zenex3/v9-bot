@@ -22,7 +22,7 @@ module.exports = {
       .setLabel(L(l, 'نص الرسالة — الكلام اللي تبيعه للاعضاء', 'Message text — what you want to send'))
       .setStyle(TextInputStyle.Paragraph)
       .setRequired(true)
-      .setMaxLength(2000);
+      .setMaxLength(1024);
     const titleInput = new TextInputBuilder()
       .setCustomId('broadcast_title')
       .setLabel(L(l, 'عنوان الامبيد (اختياري)', 'Embed title (optional)'))
@@ -31,14 +31,14 @@ module.exports = {
       .setMaxLength(80);
     const targetInput = new TextInputBuilder()
       .setCustomId('broadcast_target')
-      .setLabel(L(l, 'الي مين؟ (all = الجميع / member = عضو واحد + الادنى)', 'Target? (all / member)'))
+      .setLabel(L(l, 'الي مين؟ all او member', 'Target? all or member'))
       .setStyle(TextInputStyle.Short)
       .setRequired(false)
       .setMaxLength(20)
       .setValue('all');
     const memberInput = new TextInputBuilder()
       .setCustomId('broadcast_member')
-      .setLabel(L(l, 'ايدي العضو لو اخترت member (اختياري)', 'Member ID if target = member (optional)'))
+      .setLabel(L(l, 'ايدي العضو لو member (اختياري)', 'Member ID if member'))
       .setStyle(TextInputStyle.Short)
       .setRequired(false)
       .setMaxLength(30);
