@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 const { L } = require('../../utils/i18n');
 const { embed, successEmbed } = require('../../utils/embed');
 
@@ -67,13 +67,6 @@ async function handleModal(client, interaction) {
     return interaction.reply({ embeds: [embed(interaction.guild, { title: '❌', description: L(l, 'اكتب رسالة اولا', 'Write a message first'), color: 'error' })], ephemeral: true });
   }
 
-  const joinBtn = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setLabel(L(l, '🎟️ اشترك الآن', '🎟️ Subscribe now'))
-      .setStyle(ButtonStyle.Link)
-      .setURL('https://discord.gg/KwbNWbHmnH'),
-  );
-
   if (target === 'member' && memberId) {
     const user = await client.users.fetch(memberId).catch(() => null);
     if (!user) {
@@ -82,7 +75,7 @@ async function handleModal(client, interaction) {
     const dmEmbed = buildBroadcast(message, title, user, l);
     try {
       const dm = await user.createDM();
-      await dm.send({ embeds: [dmEmbed], components: [joinBtn] });
+      await dm.send({ embeds: [dmEmbed] });
       return interaction.reply({ embeds: [successEmbed(interaction.guild, L(l, '✅ تم الارسال', '✅ Sent'), `${L(l, 'تم ارسال الرسالة إلى', 'Message sent to')} **${user.tag}** (${user})`)] });
     } catch (e) {
       return interaction.reply({ embeds: [embed(interaction.guild, { title: '❌', description: L(l, `تعذر ارسال الخاص إلى ${user.tag} — غالبا مفعّل له الـ DMs مقفول`, `Could not DM ${user.tag} — their DMs are probably closed`), color: 'error' })], ephemeral: true });
@@ -100,7 +93,7 @@ async function handleModal(client, interaction) {
   for (const member of allMembers.values()) {
     try {
       const dm = await member.createDM();
-      await dm.send({ embeds: [dmEmbed], components: [joinBtn] });
+      await dm.send({ embeds: [dmEmbed] });
       sent++;
     } catch {
       failed++;
