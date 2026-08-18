@@ -226,10 +226,16 @@ async function redeemSerial(client, user, rawKey) {
   serial.usedAt = now;
   serial.expiresAt = expiresAt;
 
+  // تتبع كل من استخدم السيريال (مفيد للسيريالات العامة التي يستخدمها اكثر من شخص)
+  if (!Array.isArray(serial.usageList)) serial.usageList = [];
+  serial.usageList.push({ userId: user.id, tag: user.tag || String(user.id), usedAt: now, expiresAt });
+  serial.usedBy = user.id;
+
   // Public serials: don't mark as used so anyone can reuse
-  if (serial.userId) {
+  if (!serial.userId) {
+    serial.usedCount = (serial.usedCount || 0) + 1;
+  } else {
     serial.used = true;
-    serial.usedBy = user.id;
   }
 
   shop.subscriptions[user.id] = {

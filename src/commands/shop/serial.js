@@ -108,14 +108,23 @@ module.exports = {
         return interaction.reply({ embeds: [errorEmbed(interaction.guild, '❌', L(l, 'السيريال غير موجود', 'Serial not found'))] });
       }
       const owner = serial.userId ? `<@${serial.userId}>` : L(l, '🌐 العامة (أي شخص)', '🌐 Public (anyone)');
+
+      let usageLines = L(l, '_لا يوجد استخدام بعد_', '_No usage yet_');
+      if (Array.isArray(serial.usageList) && serial.usageList.length) {
+        usageLines = serial.usageList.map((u, i) =>
+          `${i + 1}) **${u.tag}** (<@${u.userId}>)\n   🕐 ${relative(u.usedAt)} | ⏳ ينتهي: ${relative(u.expiresAt)}`
+        ).join('\n');
+      }
+
       const status = serial.used
-        ? `🔴 مستخدم — **المستخدم:** <@${serial.usedBy}>\n**تاريخ الاستخدام:** ${relative(serial.usedAt)}\n**ينتهي:** ${relative(serial.expiresAt)}`
-        : '🟢 متاح';
+        ? `🔴 مستخدم — المجموع: **${serial.usageList?.length || 1}** مرة`
+        : (serial.usedCount > 0 ? `🟢 متاح (استُخدم **${serial.usedCount}** مرة)` : '🟢 متاح');
+
       return interaction.reply({
         embeds: [embed(interaction.guild, {
           title: '🔑 معلومات السيريال',
-          description: `**السيريال:** \`${serial.key}\`\n**مخصص ل:** ${owner}\n**المدة:** ${formatTime(serial.durationMs)}\n**تاريخ الانشاء:** ${relative(serial.createdAt)}\n**الحالة:** ${status}`,
-          color: serial.used ? 'warning' : 'success',
+          description: `**السيريال:** \`${serial.key}\`\n**مخصص ل:** ${owner}\n**المدة:** ${formatTime(serial.durationMs)}\n**تاريخ الانشاء:** ${relative(serial.createdAt)}\n**الحالة:** ${status}\n\n**👥 المستخدمون:**\n${usageLines}`,
+          color: serial.used || (serial.usedCount || 0) > 0 ? 'warning' : 'success',
         })],
       });
     }
