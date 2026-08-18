@@ -69,6 +69,53 @@ function findProduct(shop, query) {
   return list.find((p) => p.name.toLowerCase() === query.toLowerCase()) || null;
 }
 
+// إدارة حظر المستخدمين من سيريال معين
+function banUserFromSerial(key, userId) {
+  const shop = getShop();
+  const serial = shop.serials[String(key).trim().toUpperCase()];
+  if (!serial) return false;
+  if (!Array.isArray(serial.banned)) serial.banned = [];
+  if (!serial.banned.includes(userId)) serial.banned.push(userId);
+  saveShop(shop);
+  return true;
+}
+
+function unbanUserFromSerial(key, userId) {
+  const shop = getShop();
+  const serial = shop.serials[String(key).trim().toUpperCase()];
+  if (!serial) return false;
+  if (Array.isArray(serial.banned)) {
+    serial.banned = serial.banned.filter((id) => id !== userId);
+  }
+  saveShop(shop);
+  return true;
+}
+
+function removeUserFromSerial(key, userId) {
+  const shop = getShop();
+  const serial = shop.serials[String(key).trim().toUpperCase()];
+  if (!serial) return false;
+  if (Array.isArray(serial.usageList)) {
+    serial.usageList = serial.usageList.filter((u) => u && String(u.userId) !== String(userId));
+  }
+  if (serial.usedBy && String(serial.usedBy) === String(userId)) {
+    serial.usedBy = null;
+    serial.usedAt = null;
+    serial.expiresAt = null;
+    serial.used = false;
+  }
+  // حذف الاشتراك الناتج عن هذا السيريال لهذا المستخدم
+  if (shop.subscriptions[userId] && shop.subscriptions[userId].key === serial.key) {
+    delete shop.subscriptions[userId];
+  }
+  saveShop(shop);
+  return true;
+}
+
+function isUserBannedFromSerial(serial, userId) {
+  return !!(serial && Array.isArray(serial.banned) && serial.banned.includes(userId));
+}
+
 function createProduct({ name, description, price, duration, content, category, image }) {
   const shop = getShop();
   const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -184,6 +231,15 @@ async function redeemSerial(client, user, rawKey) {
       embed: errorEmbed(null, pick(userId, '❌ سيريال غير صالح', '❌ Invalid serial'), pick(userId,
         `السيريال **${key || '(فارغ)'}** غير موجود او غير صحيح.\n\n⚠️ **عشان تشترك لازم تشتري سيريال من هنا:**\n🔗 **${shop.invite}**`,
         `The serial **${key || '(empty)'}** does not exist or is invalid.\n\n⚠️ **To subscribe you need to buy a serial from here:**\n🔗 **${shop.invite}**`)),
+    };
+  }
+
+  if (isUserBannedFromSerial(serial, user.id)) {
+    return {
+      ok: false,
+      embed: errorEmbed(null, pick(userId, '⛔ انت محظور من هذا السيريال', '⛔ You are banned from this serial'), pick(userId,
+        `عذرا، تم حظرك من استخدام هذا السيريال.\n\n🔗 **سيرفر الدعم:** ${shop.invite}`,
+        `Sorry, you are banned from using this serial.\n\n🔗 **Support server:** ${shop.invite}`)),
     };
   }
 
@@ -589,6 +645,10 @@ module.exports = {
   createProduct,
   deleteProduct,
   toggleProduct,
+  banUserFromSerial,
+  unbanUserFromSerial,
+  removeUserFromSerial,
+  isUserBannedFromSerial,
   createSerials,
   deleteSerial,
   getSerial,

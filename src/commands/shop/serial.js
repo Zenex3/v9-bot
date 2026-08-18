@@ -10,6 +10,9 @@ const {
   listSerials,
   formatSerialList,
   sendSerialToUser,
+  banUserFromSerial,
+  unbanUserFromSerial,
+  removeUserFromSerial,
 } = require('../../services/shopService');
 
 module.exports = {
@@ -49,6 +52,24 @@ module.exports = {
       .addStringOption((o) => o.setName('key').setDescription('السيريال المرسل (اختياري — لو مترجعش انشئ جديد ب user+duration)'))
       .addStringOption((o) => o.setName('duration').setDescription('المدة عند انشاء سيريال جديد (مثال: 30d, 1w, 24h)'))
     )
+    .addSubcommand((s) => s
+      .setName('ban')
+      .setDescription('حظر مستخدم من استخدام سيريال معين')
+      .setDescriptionLocalizations({ 'en-US': 'Ban a user from using a specific serial' })
+      .addStringOption((o) => o.setName('key').setDescription('السيريال').setRequired(true))
+      .addUserOption((o) => o.setName('user').setDescription('المستخدم المراد حظره').setRequired(true)))
+    .addSubcommand((s) => s
+      .setName('unban')
+      .setDescription('الغاء حظر مستخدم من سيريال معين')
+      .setDescriptionLocalizations({ 'en-US': 'Unban a user from a specific serial' })
+      .addStringOption((o) => o.setName('key').setDescription('السيريال').setRequired(true))
+      .addUserOption((o) => o.setName('user').setDescription('المستخدم المراد الغاء حظره').setRequired(true)))
+    .addSubcommand((s) => s
+      .setName('removeuser')
+      .setDescription('حذف مستخدم من قائمة مستخدمي السيريال')
+      .setDescriptionLocalizations({ 'en-US': 'Remove a user from serial usage list' })
+      .addStringOption((o) => o.setName('key').setDescription('السيريال').setRequired(true))
+      .addUserOption((o) => o.setName('user').setDescription('المستخدم المراد حذفه').setRequired(true)))
     .setDefaultMemberPermissions(8),
   devOnly: true,
   async run(client, interaction) {
@@ -158,13 +179,44 @@ module.exports = {
         ? `🔴 مستخدم — المجموع: **${usageCount}** مرة`
         : (usageCount > 0 ? `🟢 متاح (استُخدم **${usageCount}** مرة)` : '🟢 متاح');
 
+      let bannedLines = L(l, '_لا يوجد محظورون_', '_No banned users_');
+      if (Array.isArray(serial.banned) && serial.banned.length) {
+        bannedLines = serial.banned.map((uid, i) => `${i + 1}) **ID: ${uid}** (<@${uid}>)`).join('\n');
+      }
+
       return interaction.reply({
         embeds: [embed(interaction.guild, {
           title: '🔑 معلومات السيريال',
-          description: `**السيريال:** \`${serial.key}\`\n**مخصص ل:** ${owner}\n**المدة:** ${formatTime(serial.durationMs)}\n**تاريخ الانشاء:** ${relative(serial.createdAt)}\n**الحالة:** ${status}\n\n**👥 المستخدمون (${users.length || (serial.used ? 1 : 0)}):**\n${usageLines}`,
+          description: `**السيريال:** \`${serial.key}\`\n**مخصص ل:** ${owner}\n**المدة:** ${formatTime(serial.durationMs)}\n**تاريخ الانشاء:** ${relative(serial.createdAt)}\n**الحالة:** ${status}\n\n**👥 المستخدمون (${users.length || (serial.used ? 1 : 0)}):**\n${usageLines}\n\n**🚫 المحظورون (${serial.banned?.length || 0}):**\n${bannedLines}`,
           color: serial.used || usageCount > 0 ? 'warning' : 'success',
         })],
       });
+    }
+
+    if (sub === 'ban') {
+      const target = interaction.options.getUser('user');
+      if (!banUserFromSerial(key, target.id)) {
+        return interaction.reply({ embeds: [errorEmbed(interaction.guild, '❌', L(l, 'السيريال غير موجود', 'Serial not found'))] });
+      }
+      return interaction.reply({ embeds: [successEmbed(interaction.guild, L(l, '🚫 تم الحظر', '🚫 Banned'), `${L(l, 'تم حظر', 'Banned')} **${target.tag}** ${L(l, 'من استخدام السيريال', 'from this serial')} \`${key.toUpperCase()}\``)] });
+    }
+
+    if (sub === 'unban') {
+      const target = interaction.options.getUser('user');
+      if (!unbanUserFromSerial(key, target.id)) {
+        return interaction.reply({ embeds: [errorEmbed(interaction.guild, '❌', L(l, 'السيريال غير موجود', 'Serial not found'))] });
+      }
+      return interaction.reply({ embeds: [successEmbed(interaction.guild, L(l, '✅ تم الغاء الحظر', '✅ Unbanned'), `${L(l, 'تم الغاء حظر', 'Unbanned')} **${target.tag}** ${L(l, 'من السيريال', 'from the serial')} \`${key.toUpperCase()}\``)] });
+    }
+
+    if (sub === 'removeuser') {
+      const target = interaction.options.getUser('user');
+      if (!removeUserFromSerial(key, target.id)) {
+        return interaction.reply({ embeds: [errorEmbed(interaction.guild, '❌', L(l, 'السيريال غير موجود', 'Serial not found'))] });
+      }
+      const serial = getSerial(key);
+      const left = (serial?.usageList || []).filter((u) => u && String(u.userId) !== String(target.id)).length;
+      return interaction.reply({ embeds: [successEmbed(interaction.guild, L(l, '✅ تم الحذف', '✅ Removed'), `${L(l, 'تم حذف', 'Removed')} **${target.tag}** ${L(l, 'من قائمة مستخدمي السيريال', 'from serial users')} \`${key.toUpperCase()}\`\n${L(l, 'المستخدمون المتبقون:', 'Remaining users:')} **${left}**`)] });
     }
 
     if (sub === 'delete') {
