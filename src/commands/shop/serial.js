@@ -109,22 +109,60 @@ module.exports = {
       }
       const owner = serial.userId ? `<@${serial.userId}>` : L(l, '🌐 العامة (أي شخص)', '🌐 Public (anyone)');
 
+      // نبني قائمة المستخدمين من الاشتراكات (كل من فعّل هذا السيريال) + سجل الاستخدام الجديد
+      const seen = new Map();
+      for (const [uid, sub] of Object.entries(shop.subscriptions || {})) {
+        if (sub && sub.key === serial.key) {
+          seen.set(uid, {
+            userId: uid,
+            tag: `ID: ${uid}`,
+            usedAt: sub.activatedAt || serial.usedAt,
+            expiresAt: sub.expiresAt || serial.expiresAt,
+          });
+        }
+      }
+      if (Array.isArray(serial.usageList)) {
+        for (const u of serial.usageList) {
+          if (u && u.userId !== null && u.userId !== undefined) {
+            seen.set(String(u.userId), {
+              userId: u.userId,
+              tag: u.tag || `ID: ${u.userId}`,
+              usedAt: u.usedAt,
+              expiresAt: u.expiresAt,
+            });
+          }
+        }
+      }
+      if (serial.usedBy && !seen.has(serial.usedBy)) {
+        seen.set(serial.usedBy, {
+          userId: serial.usedBy,
+          tag: `ID: ${serial.usedBy}`,
+          usedAt: serial.usedAt,
+          expiresAt: serial.expiresAt,
+        });
+      }
+
+      const users = [...seen.values()].sort((a, b) => (a.usedAt || 0) - (b.usedAt || 0));
+      const usageCount = serial.usedCount || users.length;
+
       let usageLines = L(l, '_لا يوجد استخدام بعد_', '_No usage yet_');
-      if (Array.isArray(serial.usageList) && serial.usageList.length) {
-        usageLines = serial.usageList.map((u, i) =>
+      if (users.length) {
+        usageLines = users.map((u, i) =>
           `${i + 1}) **${u.tag}** (<@${u.userId}>)\n   🕐 ${relative(u.usedAt)} | ⏳ ينتهي: ${relative(u.expiresAt)}`
         ).join('\n');
+      } else if (serial.used) {
+        usageLines = `1) **ID: ${serial.usedBy}** (<@${serial.usedBy}>)\n   🕐 ${relative(serial.usedAt)} | ⏳ ينتهي: ${relative(serial.expiresAt)}`;
       }
 
       const status = serial.used
-        ? `🔴 مستخدم — المجموع: **${serial.usageList?.length || 1}** مرة`
-        : (serial.usedCount > 0 ? `🟢 متاح (استُخدم **${serial.usedCount}** مرة)` : '🟢 متاح');
+        ? `🔴 مستخدم — المجموع: **${usageCount}** مرة`
+        : (usageCount > 0 ? `🟢 متاح (استُخدم **${usageCount}** مرة)` : '🟢 متاح');
 
       return interaction.reply({
         embeds: [embed(interaction.guild, {
           title: '🔑 معلومات السيريال',
-          description: `**السيريال:** \`${serial.key}\`\n**مخصص ل:** ${owner}\n**المدة:** ${formatTime(serial.durationMs)}\n**تاريخ الانشاء:** ${relative(serial.createdAt)}\n**الحالة:** ${status}\n\n**👥 المستخدمون:**\n${usageLines}`,
-          color: serial.used || (serial.usedCount || 0) > 0 ? 'warning' : 'success',
+          description: `**السيريال:** \`${serial.key}\`\n**مخصص ل:** ${owner}\n**المدة:** ${formatTime(serial.durationMs)}\n**تاريخ الانشاء:** ${relative(serial.createdAt)}\n**الحالة:** ${status}\n\n**👥 المستخدمون (${users.length || (serial.used ? 1 : 0)}):**\n${usageLines}`,
+          color: serial.used || usageCount > 0 ? 'warning' : 'success',
         })],
       });
     }
