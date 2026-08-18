@@ -1,8 +1,52 @@
 const fs = require('fs');
 const path = require('path');
+const logger = require('./logger');
 
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
+const BACKUP_DIR = path.join(__dirname, '..', '..', 'backups');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+
+const BACKUP_KEEP = 50;
+
+// يعمل نسخة احتياطية لكل قواعد البيانات في ملف واحد آمن
+function backupNow() {
+  try {
+    flushAll();
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const target = path.join(BACKUP_DIR, `backup-${stamp}.json`);
+    const snapshot = {};
+    for (const d of ALL_DBS()) {
+      snapshot[d.name] = d.data;
+    }
+    fs.writeFileSync(target, JSON.stringify(snapshot, null, 2), 'utf8');
+    const files = fs.readdirSync(BACKUP_DIR).filter((f) => f.startsWith('backup-') && f.endsWith('.json')).sort();
+    while (files.length > BACKUP_KEEP) {
+      const oldest = files.shift();
+      try { fs.unlinkSync(path.join(BACKUP_DIR, oldest)); } catch {}
+    }
+    logger.info(`[BACKUP] نسخة احتياطية محفوظة (${Object.keys(snapshot).length} قاعدة)`);
+  } catch (e) {
+    logger.error('[BACKUP] فشل النسخ الاحتياطي:', e.message);
+  }
+}
+
+// دالة لاسترجاع نسخة احتياطية (للاستخدام اليدوي عند الحاجة)
+function restoreBackup(file) {
+  try {
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (!raw || typeof raw !== 'object') return false;
+    const { db } = require('./database');
+    const map = { guilds: db.guilds.db, members: db.members, users: db.users, giveaways: db.giveaways, tickets: db.tickets, bot: db.bot };
+    for (const name of Object.keys(raw)) {
+      if (map[name]) { map[name].data = raw[name]; map[name].save(true); }
+    }
+    return true;
+  } catch (e) {
+    logger.error('[BACKUP] فشل الاسترجاع:', e.message);
+    return false;
+  }
+}
 
 class Database {
   constructor(name) {
@@ -142,14 +186,18 @@ process.on('exit', () => {
   db.giveaways.flush();
   db.tickets.flush();
   db.bot.flush();
+  try { backupNow(); } catch {}
 });
 
 const ALL_DBS = () => [db.guilds.db, db.members, db.users, db.giveaways, db.tickets, db.bot];
 function flushAll() { for (const d of ALL_DBS()) d.flush(); }
 
-process.on('SIGINT', () => { flushAll(); process.exit(0); });
-process.on('SIGTERM', () => { flushAll(); process.exit(0); });
+process.on('SIGINT', () => { flushAll(); backupNow(); process.exit(0); });
+process.on('SIGTERM', () => { flushAll(); backupNow(); process.exit(0); });
+process.on('uncaughtException', (e) => { flushAll(); backupNow(); logger.error('[FATAL]', e); process.exit(1); });
+process.on('unhandledRejection', (e) => { flushAll(); backupNow(); logger.error('[FATAL]', e); });
 
 setInterval(flushAll, 60_000).unref();
+setInterval(backupNow, 3_600_000).unref();
 
-module.exports = { db, memberKey, userKey, getMember, Database, DATA_DIR, flushAll };
+module.exports = { db, memberKey, userKey, getMember, Database, DATA_DIR, BACKUP_DIR, flushAll, backupNow, restoreBackup };
