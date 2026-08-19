@@ -44,7 +44,31 @@ function getShop() {
   return shop;
 }
 
+const deletedSerials = new Set();
+const deletedSubs = new Set();
+
+function readShopFromDisk() {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const file = path.join(__dirname, '..', '..', 'data', 'bot.json');
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return raw && raw.shop && typeof raw.shop === 'object' ? raw.shop : null;
+  } catch {
+    return null;
+  }
+}
+
 function saveShop(shop) {
+  const disk = readShopFromDisk();
+  if (disk) {
+    const diskSerials = { ...(disk.serials || {}) };
+    const diskSubs = { ...(disk.subscriptions || {}) };
+    for (const k of deletedSerials) delete diskSerials[k];
+    for (const k of deletedSubs) delete diskSubs[k];
+    shop.serials = { ...diskSerials, ...(shop.serials || {}) };
+    shop.subscriptions = { ...diskSubs, ...(shop.subscriptions || {}) };
+  }
   db.bot.set('shop', shop);
   db.bot.flush();
 }
@@ -107,6 +131,7 @@ function removeUserFromSerial(key, userId) {
   // حذف الاشتراك الناتج عن هذا السيريال لهذا المستخدم
   if (shop.subscriptions[userId] && shop.subscriptions[userId].key === serial.key) {
     delete shop.subscriptions[userId];
+    deletedSubs.add(userId);
   }
   saveShop(shop);
   return true;
@@ -183,6 +208,7 @@ function deleteSerial(key) {
   key = String(key).trim().toUpperCase();
   if (!shop.serials[key]) return false;
   delete shop.serials[key];
+  deletedSerials.add(key);
   saveShop(shop);
   return true;
 }
@@ -300,6 +326,7 @@ async function redeemSerial(client, user, rawKey) {
     expiresAt,
     expiryNotified: false,
   };
+  deletedSubs.delete(user.id);
   saveShop(shop);
 
   const content = getAllProductsContent(shop);

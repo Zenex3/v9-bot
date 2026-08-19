@@ -190,7 +190,14 @@ process.on('exit', () => {
 });
 
 const ALL_DBS = () => [db.guilds.db, db.members, db.users, db.giveaways, db.tickets, db.bot];
-function flushAll() { for (const d of ALL_DBS()) d.flush(); }
+function flushAll() {
+  try {
+    const { getShop, saveShop } = require('../services/shopService');
+    const shop = getShop();
+    if (shop) saveShop(shop);
+  } catch {}
+  for (const d of ALL_DBS()) d.flush();
+}
 
 process.on('SIGINT', () => { flushAll(); backupNow(); process.exit(0); });
 process.on('SIGTERM', () => { flushAll(); backupNow(); process.exit(0); });

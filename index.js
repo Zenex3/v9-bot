@@ -24,9 +24,13 @@ function acquireLock() {
     if (pid && Number.isFinite(pid)) {
       let alive = true;
       try { process.kill(pid, 0); } catch { alive = false; }
-      if (alive && script === __filename) {
+      const isSelf = pid === process.pid;
+      if (alive && !isSelf && (!script || script === __filename)) {
         logger.error(`نسخة اخرى من البوت شغالة (PID ${pid}). اوقفها اولاً.`);
         process.exit(1);
+      }
+      if (isSelf) {
+        return;
       }
       try { fs.unlinkSync(LOCK_FILE); } catch {}
     }

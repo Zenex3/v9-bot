@@ -110,11 +110,11 @@ module.exports = {
 
     if (sub === 'list') {
       const status = interaction.options.getString('status') || 'all';
-      const serials = listSerials({ status, limit: 60 });
+      const serials = listSerials({ status, limit: 500 });
       const desc = formatSerialList(serials, shop);
       return interaction.reply({
         embeds: [embed(interaction.guild, {
-          title: `🔑 السيريالات (${serials.length})`,
+          title: `🔑 السيريالات (${serials.length} — الحد 500)`,
           description: desc,
           color: 'info',
         })],
