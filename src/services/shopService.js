@@ -257,6 +257,7 @@ async function redeemSerial(client, user, rawKey) {
   const shop = getShop();
   const serial = shop.serials[key];
   const userId = user.id;
+  const now = Date.now();
 
   if (!serial) {
     return {
@@ -307,7 +308,6 @@ async function redeemSerial(client, user, rawKey) {
     }
   }
 
-  const now = Date.now();
   const existing = getUserSubscription(user.id);
   const isRenew = !!(existing && existing.expiresAt > now);
   const expiresAt = isRenew ? existing.expiresAt + serial.durationMs : now + serial.durationMs;
