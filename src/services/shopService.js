@@ -242,7 +242,14 @@ function getAllProductsContent(shop) {
   const shopRef = shop || getShop();
   const list = Object.values(shopRef.products).filter((p) => p.enabled && p.content);
   if (!list.length) return '';
-  return list.map((p) => `**📦 ${p.name}:**\n${p.content}`).join('\n\n');
+  return list.map((p) => {
+    const linkLine = p.contentLink
+      ? (p.contentLinkTitle
+        ? `\n**⬇️ ${p.contentLinkTitle}:** [${p.contentLinkTitle}](${p.contentLink})`
+        : `\n**⬇️ تحميل:** [اضغط هنا](${p.contentLink})`)
+      : '';
+    return `**📦 ${p.name}:**\n${p.content}${linkLine}`;
+  }).join('\n\n');
 }
 
 async function redeemSerial(client, user, rawKey) {
@@ -478,9 +485,14 @@ function buildProductDetail(user, productId, guild, shopOverride) {
 
   let extra;
   if (subscribed) {
+    const linkLine = p.contentLink
+      ? (p.contentLinkTitle
+        ? `\n\n**⬇️ ${p.contentLinkTitle}**\n🔗 [${p.contentLinkTitle}](${p.contentLink})`
+        : `\n\n**⬇️ تحميل**\n🔗 [اضغط هنا للتحميل](${p.contentLink})`)
+      : '';
     extra = pick(userId,
-      `\n\n✅ **الخدمة متاحة لك الآن!**\n\n━━━━━━━━━━━━━━━━\n**🔗 تفاصيل الخدمة / طريقة الاستخدام:**\n${p.content || '_لا يوجد محتوى إضافي_'}`,
-      `\n\n✅ **This service is now available to you!**\n\n━━━━━━━━━━━━━━━━\n**🔗 Service details / how to use:**\n${p.content || '_No extra content_'}`);
+      `\n\n✅ **الخدمة متاحة لك الآن!**\n\n━━━━━━━━━━━━━━━━\n**🔗 تفاصيل الخدمة / طريقة الاستخدام:**\n${p.content || '_لا يوجد محتوى إضافي_'}${linkLine}`,
+      `\n\n✅ **This service is now available to you!**\n\n━━━━━━━━━━━━━━━━\n**🔗 Service details / how to use:**\n${p.content || '_No extra content_'}${linkLine}`);
   } else {
     extra = pick(userId,
       `\n\n🔒 **الخدمة مقفولة** — اشتراك واحد بيفعّل كل المنتجات بالكامل.\n⚠️ **عشان تستخدم الخدمة لازم تشترك من هنا:**\n🔗 **${shop.invite}**\n\n**📥 عندك سيريال؟** فعّله بامر \`/redeem\``,
@@ -540,9 +552,14 @@ function buildSubscriptionEmbed(user, guild, shopOverride) {
         if (!p.enabled) continue;
         if (embeds.length >= 10) break;
         const body = p.content || p.description || '_لا يوجد محتوى إضافي_';
+        const linkLine = p.contentLink
+          ? (p.contentLinkTitle
+            ? `\n\n**⬇️ ${p.contentLinkTitle}**\n🔗 [${p.contentLinkTitle}](${p.contentLink})`
+            : `\n\n**⬇️ تحميل**\n🔗 [اضغط هنا للتحميل](${p.contentLink})`)
+          : '';
         embeds.push(embed(guild, {
           title: `📦 ${p.name}`,
-          description: `━━━━━━━━━━━━━━━━\n${body}\n━━━━━━━━━━━━━━━━`,
+          description: `━━━━━━━━━━━━━━━━\n${body}${linkLine}\n━━━━━━━━━━━━━━━━`,
           image: p.image || null,
           color: 'success',
         }));

@@ -27,9 +27,10 @@ module.exports = {
     .addSubcommand((s) => s.setName('list').setDescription('عرض كل المنتجات').setDescriptionLocalizations({ 'en-US': 'List all products' }))
     .addSubcommand((s) => s.setName('remove').setDescription('حذف منتج').setDescriptionLocalizations({ 'en-US': 'Remove a product' }).addStringOption((o) => o.setName('id').setDescription('ايدي او اسم المنتج').setRequired(true)))
     .addSubcommand((s) => s.setName('toggle').setDescription('تفعيل/ايقاف منتج').setDescriptionLocalizations({ 'en-US': 'Enable/disable a product' }).addStringOption((o) => o.setName('id').setDescription('ايدي او اسم المنتج').setRequired(true)))
-    .addSubcommand((s) => s.setName('link').setDescription('اضافة/تغيير رابط المحتوى المخصص للمنتج').setDescriptionLocalizations({ 'en-US': 'Set a custom content link for the product' })
+    .addSubcommand((s) => s.setName('link').setDescription('اضافة/تغيير رابط تحميل ب عنوان يظهر للمشترك تحت الشرح').setDescriptionLocalizations({ 'en-US': 'Set a titled download link shown to the subscriber under the description' })
       .addStringOption((o) => o.setName('id').setDescription('ايدي او اسم المنتج').setRequired(true))
-      .addStringOption((o) => o.setName('url').setDescription('الرابط').setRequired(true)))
+      .addStringOption((o) => o.setName('url').setDescription('الرابط').setRequired(true))
+      .addStringOption((o) => o.setName('title').setDescription('اسم التحميل — يظهر كعنوان فوق الرابط (اختياري)').setDescriptionLocalizations({ 'en-US': 'Download name shown as the link title (optional)' })))
     .addSubcommand((s) => s.setName('image').setDescription('اضافة/تغيير صورة المنتج (تظهر للمشترك)').setDescriptionLocalizations({ 'en-US': 'Set product image (shown to subscriber)' })
       .addStringOption((o) => o.setName('id').setDescription('ايدي او اسم المنتج').setRequired(true))
       .addStringOption((o) => o.setName('url').setDescription('رابط الصورة — مثال: https://.../img.png').setRequired(true)))
@@ -122,10 +123,13 @@ module.exports = {
 
     if (sub === 'link') {
       const url = interaction.options.getString('url');
-      product.contentLink = url;
+      const title = interaction.options.getString('title')?.trim() || null;
+      product.contentLink = url || null;
+      product.contentLinkTitle = title || null;
       const { saveShop } = require('../../services/shopService');
       saveShop(getShop());
-      return interaction.reply({ embeds: [successEmbed(interaction.guild, L(l, '✅ تم الحفظ', '✅ Saved'), `${L(l, 'تم تحديث رابط', 'Content link updated for')} **${product.name}**`)] });
+      const added = title ? `**⬇️ [${title}](${url})**` : `**⬇️ ${url}**`;
+      return interaction.reply({ embeds: [successEmbed(interaction.guild, L(l, '✅ تم الحفظ', '✅ Saved'), `${L(l, 'تم تحديث رابط التحميل', 'Download link updated for')} **${product.name}**\n${added}`)] });
     }
 
     if (sub === 'image') {
