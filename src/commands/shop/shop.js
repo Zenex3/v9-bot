@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { buildShopMenu, buildCategoryEmbed, buildProductDetail, buildSubscriptionEmbed } = require('../../services/shopService');
 
 module.exports = {
@@ -26,6 +26,16 @@ async function handleShopButton(client, interaction) {
     const pid = interaction.values[0];
     return interaction.update(buildProductDetail(interaction.user, pid, interaction.guild));
   }
+  if (id === 'my_prod') {
+    const pid = interaction.values[0];
+    const result = buildProductDetail(interaction.user, pid, interaction.guild);
+    result.components = [
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('shop_my').setLabel('⬅️ رجوع لاشتراكي').setStyle(ButtonStyle.Secondary),
+      ),
+    ];
+    return interaction.update(result);
+  }
   if (id.startsWith('shop_cat_')) {
     const cat = id.slice('shop_cat_'.length);
     return interaction.update(buildCategoryEmbed(interaction.user, cat, interaction.guild));
@@ -38,4 +48,5 @@ module.exports.components = {
   'shop_back': handleShopButton,
   'shop_my': handleShopButton,
   'shop_prod': handleShopButton,
+  'my_prod': handleShopButton,
 };

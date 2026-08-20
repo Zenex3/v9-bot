@@ -523,6 +523,7 @@ function buildSubscriptionEmbed(user, guild, shopOverride) {
   const userId = user.id;
   const sub = getUserSubscription(userId);
   const embeds = [];
+  const components = [];
   let desc;
 
   if (!sub) {
@@ -537,9 +538,16 @@ function buildSubscriptionEmbed(user, guild, shopOverride) {
     }));
   } else {
     const active = sub.expiresAt > Date.now();
+    const products = Object.values(shop.products).filter((p) => p.enabled);
+
     desc = pick(userId,
       `${active ? '🟢 **اشتراكك مفعل**' : '🔴 **اشتراكك منتهي**'}\n**السيريال:** \`${sub.key}\`\n**فُعل:** ${relative(sub.activatedAt)}\n**ينتهي:** ${relative(sub.expiresAt)}`,
       `${active ? '🟢 **Subscription active**' : '🔴 **Subscription expired**'}\n**Serial:** \`${sub.key}\`\n**Activated:** ${relative(sub.activatedAt)}\n**Expires:** ${relative(sub.expiresAt)}`);
+
+    if (active && products.length) {
+      desc += `\n\n**${pick(userId, '⬇️ اختر منتج لعرض تفاصيله', '⬇️ Select a product to view details')}**`;
+    }
+
     embeds.push(embed(guild, {
       title: pick(userId, '📦 اشتراكي', '📦 My Subscription'),
       description: desc,
@@ -547,32 +555,20 @@ function buildSubscriptionEmbed(user, guild, shopOverride) {
       color: active ? 'success' : 'red',
     }));
 
-    if (active) {
-      for (const p of Object.values(shop.products)) {
-        if (!p.enabled) continue;
-        if (embeds.length >= 10) break;
-        const body = p.content || p.description || '_لا يوجد محتوى إضافي_';
-        const linkLine = p.contentLink
-          ? (p.contentLinkTitle
-            ? `\n\n**⬇️ ${p.contentLinkTitle}**\n🔗 [${p.contentLinkTitle}](${p.contentLink})`
-            : `\n\n**⬇️ تحميل**\n🔗 [اضغط هنا للتحميل](${p.contentLink})`)
-          : '';
-        embeds.push(embed(guild, {
-          title: `📦 ${p.name}`,
-          description: `━━━━━━━━━━━━━━━━\n${body}${linkLine}\n━━━━━━━━━━━━━━━━`,
-          image: p.image || null,
-          color: 'success',
-        }));
-      }
+    if (active && products.length) {
+      const select = new StringSelectMenuBuilder()
+        .setCustomId('my_prod')
+        .setPlaceholder(pick(userId, '📦 اختر منتج...', '📦 Select a product...'));
+      select.addOptions(products.slice(0, 25).map((p) => new StringSelectMenuOptionBuilder()
+        .setLabel(p.name.slice(0, 80))
+        .setValue(p.id)
+        .setDescription((p.description || '').slice(0, 100) || pick(userId, 'عرض التفاصيل', 'View details'))
+        .setEmoji(getCategory(p.category || 'tools').icon)));
+      components.push(row(select));
     }
   }
 
-  const components = isSubscribed(userId) ? [shopMenuRow(userId)] : [];
-
-  return {
-    embeds,
-    components,
-  };
+  return { embeds, components };
 }
 
 function buildWelcomeEmbed(user, guild, shopOverride) {
