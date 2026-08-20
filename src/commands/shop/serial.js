@@ -27,8 +27,7 @@ module.exports = {
       .setDescription('انشاء سيريالات اشتراك')
       .setDescriptionLocalizations({ 'en-US': 'Create subscription serials' })
       .addStringOption((o) => o.setName('duration').setDescription('المدة (مثال: 30d, 1w, 24h)').setRequired(true))
-      .addStringOption((o) => o.setName('users').setDescription('ايديات المستخدمين مفصولين بفار — اتركه فاضي للعامة').setDescriptionLocalizations({ 'en-US': 'User IDs separated by comma — leave empty for public' }))
-      .addIntegerOption((o) => o.setName('amount').setDescription('العدد لكل مستخدم (افتراضي 1)').setMinValue(1).setMaxValue(50)))
+      .addIntegerOption((o) => o.setName('amount').setDescription('عدد السيريالات (افتراضي 1)').setMinValue(1).setMaxValue(100)))
     .addSubcommand((s) => s
       .setName('list')
       .setDescription('عرض السيريالات')
@@ -78,7 +77,6 @@ module.exports = {
     const shop = getShop();
 
     if (sub === 'create') {
-      const usersInput = interaction.options.getString('users');
       const durInput = interaction.options.getString('duration');
       const durationMs = parseDuration(durInput);
       if (!durationMs) {
@@ -86,25 +84,9 @@ module.exports = {
       }
       const amount = interaction.options.getInteger('amount') || 1;
 
-      const allKeys = [];
-      const results = [];
+      const keys = createSerials({ userId: null, durationMs, amount, createdBy: interaction.user.id });
 
-      if (!usersInput || !usersInput.trim()) {
-        const keys = createSerials({ userId: null, durationMs, amount, createdBy: interaction.user.id });
-        allKeys.push(...keys);
-        results.push(`**العامة (أي شخص):** ${keys.map(k => `\`${k}\``).join(' ')}`);
-      } else {
-        const userIds = usersInput.split(',').map(s => s.trim().replace(/[<@!>]/g, '')).filter(Boolean);
-        for (const uid of userIds) {
-          const member = await interaction.guild.members.fetch(uid).catch(() => null);
-          const tag = member ? member.user.tag : uid;
-          const keys = createSerials({ userId: uid, durationMs, amount, createdBy: interaction.user.id });
-          allKeys.push(...keys);
-          results.push(`**${tag}** (<@${uid}>): ${keys.map(k => `\`${k}\``).join(' ')}`);
-        }
-      }
-
-      const desc = `**المدة:** ${formatTime(durationMs)}\n**العدد:** ${amount} لكل مستخدم\n**اجمالي السيريالات:** ${allKeys.length}\n\n${results.join('\n')}`;
+      const desc = `**المدة:** ${formatTime(durationMs)}\n**العدد:** ${keys.length}\n**النوع:** 🌐 عام (أي شخص يقدر يستخدمه)\n\n${keys.map(k => `\`${k}\``).join('\n')}`;
       return interaction.reply({ embeds: [successEmbed(interaction.guild, L(l, '✅ تم انشاء السيريالات', '✅ Serials created'), desc)], ephemeral: true });
     }
 
@@ -238,14 +220,13 @@ module.exports = {
         if (!durationMs) {
           return interaction.reply({ embeds: [errorEmbed(interaction.guild, '❌', L(l, 'اكتب سيريال موجود او مدة لانشاء واحد جديد (30d, 1w, 24h)', 'Provide an existing key or a duration to create a new one (30d, 1w, 24h)'))] });
         }
-        serialKey = createSerials({ userId: target.id, durationMs, amount: 1, createdBy: interaction.user.id })[0];
+        serialKey = createSerials({ userId: null, durationMs, amount: 1, createdBy: interaction.user.id })[0];
       } else {
         const existing = getSerial(serialKey);
-        if (!existing) {
+        if (existing) {
+          serialKey = existing.key;
+        } else {
           return interaction.reply({ embeds: [errorEmbed(interaction.guild, '❌', L(l, 'السيريال غير موجود', 'Serial not found'))] });
-        }
-        if (existing.userId !== target.id) {
-          return interaction.reply({ embeds: [errorEmbed(interaction.guild, '❌', L(l, 'هذا السيريال مخصص لشخص اخر', 'This serial belongs to another user'))] });
         }
       }
 

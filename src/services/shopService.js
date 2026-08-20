@@ -253,6 +253,7 @@ function getAllProductsContent(shop) {
 }
 
 async function redeemSerial(client, user, rawKey) {
+  try {
   const key = String(rawKey || '').trim().toUpperCase();
   const shop = getShop();
   const serial = shop.serials[key];
@@ -342,7 +343,8 @@ async function redeemSerial(client, user, rawKey) {
     `${isRenew ? '🔄 تم **تجديد** اشتراكك بنجاح!' : '✅ تم تفعيل اشتراكك بنجاح!'}\n\n**🎟️ اشتراك كامل في كل المنتجات**\n**السيريال:** \`${key}\`\n**المدة:** ${formatTime(serial.durationMs)}\n**ينتهي في:** ${relative(expiresAt)}`,
     `${isRenew ? '🔄 Your subscription was **renewed**!' : '✅ Your subscription was activated!'}\n\n**🎟️ Full access to all products**\n**Serial:** \`${key}\`\n**Duration:** ${formatTime(serial.durationMs)}\n**Expires:** ${relative(expiresAt)}`);
   if (content) {
-    desc += `\n\n**${pick(userId, '📦 محتوى منتجاتك (كلها متاحة ليك):', '📦 Your products content (all unlocked):')}**\n${content}`;
+    const contentBlock = `\n\n**${pick(userId, '📦 محتوى منتجاتك (كلها متاحة ليك):', '📦 Your products content (all unlocked):')}**\n${content}`;
+    desc += desc.length + contentBlock.length > 3800 ? contentBlock.slice(0, 3800 - desc.length) + '\n...' : contentBlock;
   }
 
   const resEmbed = successEmbed(null, title, desc);
@@ -352,6 +354,14 @@ async function redeemSerial(client, user, rawKey) {
   }
 
   return { ok: true, embed: resEmbed, serial, expiresAt };
+  } catch (err) {
+    logger.error('[REDEEM] خطأ غير متوقع في redeemSerial:', err);
+    const shop = getShop();
+    return {
+      ok: false,
+      embed: errorEmbed(null, '❌', 'حدث خطأ غير متوقع — تحقق من السيرفر أو حاول مرة اخرى'),
+    };
+  }
 }
 
 async function notifyOwner(client, user, key, serial, isRenew) {
@@ -655,7 +665,7 @@ async function sendSerialToUser(client, user, key) {
   const serial = getSerial(key);
   if (!serial) return { ok: false, reason: 'serial_not_found' };
 
-  if (serial.userId !== user.id) {
+  if (serial.userId && serial.userId !== user.id) {
     return { ok: false, reason: 'wrong_user' };
   }
 
